@@ -14,15 +14,22 @@ module.exports = (app) => {
 
   router.get(
     "/",
-    [exampleMiddleware.exampleMiddleware],
-    exampleController.exampleFunction
+    exampleController.refactoreMe1
+  );
+
+  router.post(
+    "/",
+    exampleController.refactoreMe2
   );
 
   router.get(
-    "/",
-    [exampleMiddleware.exampleMiddleware],
-    exampleController.exampleFunction
+    "/livethreatmap",
+    exampleController.getData
   );
+
+  router.get(
+    "/manager",
+  )
 
   app.use("/api/data", router);
 };

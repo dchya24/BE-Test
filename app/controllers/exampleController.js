@@ -1,118 +1,121 @@
+const { default: axios } = require("axios");
 const db = require("../models");
-// const Model = db.Model;
-// const { Op } = require("sequelize");
+const { WebSocket } = require("ws");
+const { redisClient } = require("../shared/redis");
 
-exports.refactoreMe1 = (req, res) => {
+/**
+ * Dengan asumsi fungsi ini adalah mendapatkan average nilai per-pertanyaan,
+ * Maka fungsi ini mengolah data scores dari table survey yang berupa array.
+ */
+exports.refactoreMe1 = async (req, res) => {
   // function ini sebenarnya adalah hasil survey dri beberapa pertnayaan, yang mana nilai dri jawaban tsb akan di store pada array seperti yang ada di dataset
-  db.sequelize.query(`select * from "surveys"`).then((data) => {
-    let index1 = [];
-    let index2 = [];
-    let index3 = [];
-    let index4 = [];
-    let index5 = [];
-    let index6 = [];
-    let index7 = [];
-    let index8 = [];
-    let index9 = [];
-    let index10 = [];
+  try{
+    const query = await db.sequelize.query(`select values as scores from surveys`);
+    const result = query[0];
 
-    data.map((e) => {
-      let values1 = e.values[0];
-      let values2 = e.values[1];
-      let values3 = e.values[2];
-      let values4 = e.values[3];
-      let values5 = e.values[4];
-      let values6 = e.values[5];
-      let values7 = e.values[6];
-      let values8 = e.values[7];
-      let values9 = e.values[8];
-      let values10 = e.values[9];
+    // Tranpose data from n x m to m x n
+    let transposedData = result[0].scores.map((col, i) => result.map((row) => row.scores[i]))
 
-      index1.push(values1);
-      index2.push(values2);
-      index3.push(values3);
-      index4.push(values4);
-      index5.push(values5);
-      index6.push(values6);
-      index7.push(values7);
-      index8.push(values8);
-      index9.push(values9);
-      index10.push(values10);
-    });
+    let avgScores = [];
+    transposedData.forEach((data) => {
+      var score = 0;
+      var scores = data;
+      
+      scores.forEach((data) => {
+        score = score + data;
+      })
+      avgScores.push(Math.floor(score / scores.length));
+    })
 
-    let totalIndex1 = index1.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex2 = index2.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex3 = index3.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex4 = index4.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex5 = index5.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex6 = index6.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex7 = index7.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex8 = index8.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex9 = index9.reduce((a, b) => a + b, 0) / 10;
-    let totalIndex10 = index10.reduce((a, b) => a + b, 0) / 10;
 
-    let totalIndex = [
-      totalIndex1,
-      totalIndex2,
-      totalIndex3,
-      totalIndex4,
-      totalIndex5,
-      totalIndex6,
-      totalIndex7,
-      totalIndex8,
-      totalIndex9,
-      totalIndex10,
-    ];
-
-    res.status(200).send({
+    res.status(200).json({
       statusCode: 200,
       success: true,
-      data: totalIndex,
+      data: avgScores
     });
-  });
+    
+  }
+  catch(err){
+    console.error(err);
+    res.status(500).json({
+      statusCode: 500,
+      success: false,
+      message: 'Something wrong in server!'
+    });
+  }
 };
 
-exports.refactoreMe2 = (req, res) => {
-  // function ini untuk menjalakan query sql insert dan mengupdate field "dosurvey" yang ada di table user menjadi true, jika melihat data yang di berikan, salah satu usernnya memiliki dosurvey dengan data false
-  Survey.create({
-    userId: req.body.userId,
-    values: req.body.values, // [] kirim array
+exports.refactoreMe2 = async (req, res) => {
+  const t = await db.sequelize.transaction();
+  try{
+      // function ini untuk menjalakan query sql insert dan mengupdate field "dosurvey" yang ada di table user menjadi true, jika melihat data yang di berikan, salah satu usernnya memiliki dosurvey dengan data false
+    const { userId, values } = req.body;
+
+    const arrValues = values.split(",");
+
+    await db.sequelize.query(`INSERT INTO surveys("values", "userId", "createdAt", "updatedAt") VALUES($1, $2, now(), now())`, {
+      bind: [arrValues, userId]
+    });
+
+    await db.sequelize.query(`UPDATE users set dosurvey=true, "updatedAt"=now() where id=$1`, {
+      bind: [userId]
+    });
+
+    await t.commit();
+
+    res.status(201).json({
+      statusCode: 201,
+      message: "Survey sent successfully!",
+      success: true,
+    });
+  }
+  catch(err){
+    await t.rollback();
+    console.error(err);
+    res.status(500).json({
+      statusCode: 500,
+      message: "Cannot post survey.",
+      success: false,
+    });
+  };
+}
+
+exports.callmeWebSocket =  async (wss) => {
+  const api = "https://livethreatmap.radware.com/api/map/attacks?limit=10";
+
+  const response = await axios.get(api);
+  
+  wss.clients.forEach((client) => {
+    if(client.readyState == WebSocket.OPEN){
+      client.send(JSON.stringify(response.data));
+    }
   })
-    .then((data) => {
-      User.update(
-        {
-          dosurvey: true,
-        },
-        {
-          where: { id: req.body.id },
-        }
-      )
-        .then(() => {
-          console.log("success");
-        })
-        .catch((err) => console.log(err));
-
-      res.status(201).send({
-        statusCode: 201,
-        message: "Survey sent successfully!",
-        success: true,
-        data,
-      });
-    })
-    .catch((err) => {
-      console.log(err);
-      res.status(500).send({
-        statusCode: 500,
-        message: "Cannot post survey.",
-        success: false,
-      });
-    });
 };
 
-exports.callmeWebSocket = (req, res) => {
-  // do something
-};
+exports.getData = async (req, res) => {
+  let data; 
+    
+  const cache = await redisClient.get("livethreatmap");
 
-exports.getData = (req, res) => {
-  // do something
+  if(cache){
+    data = JSON.parse(cache);
+  }
+  else{
+    const destinationCountry = await db.sequelize.query("select count(distinct destinationcountry)as destinationcountry  from livethreatmap");
+
+    const sourceCountry = await db.sequelize.query("select count(distinct sourcecountry) as sourcecountry  from livethreatmap");
+
+    data = {
+      label: ['sourceCountry', 'destinationCountry'],
+      total: [sourceCountry[0][0].sourcecountry, destinationCountry[0][0].destinationcountry]
+    };
+
+    await redisClient.set("livethreatmap", JSON.stringify(data));
+  }
+
+  res.status(200).json({
+    statusCode: 200,
+    success: true,
+    data: data
+  });
 };

@@ -23,9 +23,21 @@
 
 4. Terapkan redis caching pada saat memfetch endpoint yang kamu buat di point nomor 3
 
-5. Buatkan aku middleware authentikasi jwt untuk memprotect api, serta buatkan juga middleware untuk membatasi endpoint lain berdasarkan role user, contoh :
-   walaupun si user mempunyai token yang valid, tapi tidak mempunyai role yang valid, dia tidak akan bisa membuka beberapa endpoint.
+5. Buatkan aku middleware authentikasi jwt untuk memprotect api, serta buatkan juga middleware untuk membatasi endpoint lain berdasarkan role user, contoh : walaupun si user mempunyai token yang valid, tapi tidak mempunyai role yang valid, dia tidak akan bisa membuka beberapa endpoint.
+   
+   Endpoint:
+    - GET /api/token/:id = To generate token
+    - GET /api/token/role/manager = Route with authorization user have role manager
+      
+      role didapatkan dari column positionTitle pada tabel users
+
+    <br>
 
 6. Buatkan unit test untuk mentest si endpoint berjalan dengan baik.
+
+    Script untung testing:
+    ```
+      npm run test
+    ```
 
 7. Push hasil test ini di github mu
